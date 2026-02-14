@@ -143,7 +143,9 @@ struct LaunchItemRow: View {
             // Reveal in Finder section
             Section {
                 Button(action: {
-                    NSWorkspace.shared.selectFile(item.path, inFileViewerRootedAtPath: "")
+                    if !NSWorkspace.shared.selectFile(item.path, inFileViewerRootedAtPath: "") {
+                        print("⚠️ Could not reveal \(item.path) in Finder")
+                    }
                 }) {
                     Label("Reveal in Finder", systemImage: "folder")
                 }

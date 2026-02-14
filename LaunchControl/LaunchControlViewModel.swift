@@ -374,7 +374,6 @@ class LaunchControlViewModel {
     }
     
     private func deleteItemWithoutAuth(_ item: LaunchItem) async throws {
-        let fileManager = FileManager.default
         try fileManager.removeItem(atPath: item.path)
     }
     
@@ -430,8 +429,10 @@ class LaunchControlViewModel {
                 throw InstallError.invalidPlist(url.lastPathComponent)
             }
             plist = parsed
+        } catch let installError as InstallError {
+            throw installError
         } catch {
-            throw InstallError.invalidPlist(url.lastPathComponent)
+            throw InstallError.invalidPlist("\(url.lastPathComponent): \(error.localizedDescription)")
         }
         guard let label = plist["Label"] as? String else {
             throw InstallError.missingLabel(url.lastPathComponent)
@@ -477,15 +478,21 @@ class LaunchControlViewModel {
             let label = try validatePlist(at: URL(fileURLWithPath: destPath))
             let domain = "gui/\(getuid())"
             let enableResult = await runCommand("/bin/launchctl", arguments: ["enable", "\(domain)/\(label)"])
-            if !enableResult.success {
-                print("⚠️ Warning: launchctl enable failed for \(label): \(enableResult.output)")
-            }
             let bootstrapResult = await runCommand("/bin/launchctl", arguments: ["bootstrap", domain, destPath])
-            if !bootstrapResult.success {
-                print("⚠️ Warning: launchctl bootstrap failed for \(label): \(bootstrapResult.output)")
+
+            var warnings: [String] = []
+            if !enableResult.success {
+                warnings.append("enable failed: \(enableResult.output)")
             }
-            if enableResult.success && bootstrapResult.success {
+            if !bootstrapResult.success {
+                warnings.append("start failed: \(bootstrapResult.output)")
+            }
+            if warnings.isEmpty {
                 print("✅ Enabled and started \(label)")
+            } else {
+                let msg = "Agent copied but \(warnings.joined(separator: "; "))"
+                print("⚠️ \(msg)")
+                errorMessage = msg
             }
         }
 
