@@ -13,6 +13,7 @@ A macOS app for managing LaunchAgents and LaunchDaemons with Touch ID authentica
 - **Touch ID authentication** for system-level operations
 - **Real-time status monitoring** showing whether items are running, stopped, or loaded
 - **Search and filter** capabilities
+- **Drag-and-drop installation** of new user agents from Finder
 - Modern macOS interface with split-view layout
 
 ## Requirements
