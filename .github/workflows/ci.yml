@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build & Test
+    runs-on: macos-26
+    env:
+      DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build
+        run: |
+          xcodebuild -project LaunchControl.xcodeproj \
+            -scheme LaunchControl \
+            -configuration Debug \
+            -destination "platform=macOS" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            GCC_TREAT_WARNINGS_AS_ERRORS=YES \
+            build
+
+      - name: Static Analysis
+        run: |
+          xcodebuild -project LaunchControl.xcodeproj \
+            -scheme LaunchControl \
+            -configuration Debug \
+            -destination "platform=macOS" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            analyze
+
+      - name: Unit Tests
+        run: |
+          xcodebuild -project LaunchControl.xcodeproj \
+            -scheme LaunchControl \
+            -configuration Debug \
+            -destination "platform=macOS" \
+            -only-testing:LaunchControlTests \
+            -skip-testing:LaunchControlUITests \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            test
+
+      - name: UI Tests
+        run: |
+          xcodebuild -project LaunchControl.xcodeproj \
+            -scheme LaunchControl \
+            -configuration Debug \
+            -destination "platform=macOS" \
+            -only-testing:LaunchControlUITests \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            test

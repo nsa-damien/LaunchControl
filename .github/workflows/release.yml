@@ -1,0 +1,95 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    name: Verify
+    runs-on: macos-26
+    env:
+      DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build
+        run: |
+          xcodebuild -project LaunchControl.xcodeproj \
+            -scheme LaunchControl \
+            -configuration Debug \
+            -destination "platform=macOS" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build
+
+      - name: Static Analysis
+        run: |
+          xcodebuild -project LaunchControl.xcodeproj \
+            -scheme LaunchControl \
+            -configuration Debug \
+            -destination "platform=macOS" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            analyze
+
+      - name: Unit Tests
+        run: |
+          xcodebuild -project LaunchControl.xcodeproj \
+            -scheme LaunchControl \
+            -configuration Debug \
+            -destination "platform=macOS" \
+            -only-testing:LaunchControlTests \
+            -skip-testing:LaunchControlUITests \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            test
+
+  build-and-release:
+    name: Build & Release
+    runs-on: macos-26
+    needs: verify
+    env:
+      DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Release Archive
+        run: |
+          xcodebuild -project LaunchControl.xcodeproj \
+            -scheme LaunchControl \
+            -configuration Release \
+            -destination "platform=macOS" \
+            -archivePath build/LaunchControl.xcarchive \
+            clean archive \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO
+
+      - name: Verify Archive
+        run: |
+          echo "Archive contents:"
+          ls -la build/LaunchControl.xcarchive/Products/Applications/
+          test -d "build/LaunchControl.xcarchive/Products/Applications/LaunchControl.app" || {
+            echo "ERROR: LaunchControl.app not found in archive"
+            exit 1
+          }
+
+      - name: Create Zip
+        run: |
+          cd build && ditto -c -k --sequesterRsrc --keepParent \
+            LaunchControl.xcarchive/Products/Applications/LaunchControl.app \
+            LaunchControl.zip
+
+      - name: Upload Release Artifact
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/LaunchControl.zip

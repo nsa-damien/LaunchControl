@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import AppKit
 
 struct LaunchItemRow: View {
     let item: LaunchItem
@@ -139,8 +140,19 @@ struct LaunchItemRow: View {
                 }
             }
             
+            // Reveal in Finder section
+            Section {
+                Button(action: {
+                    if !NSWorkspace.shared.selectFile(item.path, inFileViewerRootedAtPath: "") {
+                        print("⚠️ Could not reveal \(item.path) in Finder")
+                    }
+                }) {
+                    Label("Reveal in Finder", systemImage: "folder")
+                }
+            }
+
             Divider()
-            
+
             // Delete section
             Button(role: .destructive, action: {
                 showingDeleteAlert = true

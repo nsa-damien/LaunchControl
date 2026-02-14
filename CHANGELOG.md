@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Reveal in Finder context menu action for launch items
+- GitHub Actions CI workflow for pull request checks (build and test)
+- GitHub Actions Release workflow for automated builds on version tags
+- Unit test suite for ViewModel filtering, plist validation, and agent installation
+
+### Changed
+- ViewModel supports dependency injection for FileManager, command runner, and agent directory (testability)
+
+### Fixed
+- launchctl enable/bootstrap failures now surface to user via error message
+- Plist parse errors preserve original error details instead of generic message
+- deleteItemWithoutAuth uses injected FileManager consistently
+
 ## [0.1.0] - 2026-02-14
 
 ### Added
