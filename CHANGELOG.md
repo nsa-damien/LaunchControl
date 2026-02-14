@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Reveal in Finder context menu action for launch items
+- GitHub Actions CI workflow for pull request checks (build and test)
+- GitHub Actions Release workflow for automated builds on version tags
+
 ## [0.1.0] - 2026-02-14
 
 ### Added
