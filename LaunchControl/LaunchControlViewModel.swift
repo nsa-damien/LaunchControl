@@ -11,13 +11,33 @@ import SwiftUI
 @MainActor
 @Observable
 class LaunchControlViewModel {
+    typealias CommandRunner = @Sendable (_ command: String, _ arguments: [String]) async -> (success: Bool, output: String)
+
     var launchItems: [LaunchItem] = []
     var isLoading = false
     var errorMessage: String?
     var searchText = ""
     var selectedType: LaunchItemType? = .userAgent
     
-    private let authHelper = AuthenticationHelper()
+    private let authHelper: AuthenticationHelper
+    private let fileManager: FileManager
+    private let userAgentDirectory: String
+    private let commandRunner: CommandRunner?
+    private let autoRefreshAfterInstall: Bool
+
+    init(
+        authHelper: AuthenticationHelper = AuthenticationHelper(),
+        fileManager: FileManager = .default,
+        userAgentDirectory: String? = nil,
+        commandRunner: CommandRunner? = nil,
+        autoRefreshAfterInstall: Bool = true
+    ) {
+        self.authHelper = authHelper
+        self.fileManager = fileManager
+        self.userAgentDirectory = userAgentDirectory ?? LaunchItemType.userAgent.expandedDirectory
+        self.commandRunner = commandRunner
+        self.autoRefreshAfterInstall = autoRefreshAfterInstall
+    }
     
     var filteredItems: [LaunchItem] {
         var items = launchItems
@@ -86,7 +106,6 @@ class LaunchControlViewModel {
     
     private func loadItems(for type: LaunchItemType) async throws -> [LaunchItem] {
         let directory = type.expandedDirectory
-        let fileManager = FileManager.default
         
         print("🔍 Checking directory: \(directory)")
         
@@ -405,7 +424,13 @@ class LaunchControlViewModel {
         defer { if accessing { url.stopAccessingSecurityScopedResource() } }
 
         let data = try Data(contentsOf: url)
-        guard let plist = try PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any] else {
+        let plist: [String: Any]
+        do {
+            guard let parsed = try PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any] else {
+                throw InstallError.invalidPlist(url.lastPathComponent)
+            }
+            plist = parsed
+        } catch {
             throw InstallError.invalidPlist(url.lastPathComponent)
         }
         guard let label = plist["Label"] as? String else {
@@ -416,9 +441,8 @@ class LaunchControlViewModel {
 
     /// Check if a file with this name already exists in ~/Library/LaunchAgents.
     func userAgentExists(fileName: String) -> Bool {
-        let dir = LaunchItemType.userAgent.expandedDirectory
-        let dest = (dir as NSString).appendingPathComponent(fileName)
-        return FileManager.default.fileExists(atPath: dest)
+        let dest = (userAgentDirectory as NSString).appendingPathComponent(fileName)
+        return fileManager.fileExists(atPath: dest)
     }
 
     /// Copy plist to ~/Library/LaunchAgents, optionally enable and start it.
@@ -427,22 +451,22 @@ class LaunchControlViewModel {
         defer { if accessing { url.stopAccessingSecurityScopedResource() } }
 
         let fileName = url.lastPathComponent
-        let destDir = LaunchItemType.userAgent.expandedDirectory
+        let destDir = userAgentDirectory
         let destPath = (destDir as NSString).appendingPathComponent(fileName)
 
         // Ensure target directory exists
         do {
-            try FileManager.default.createDirectory(atPath: destDir, withIntermediateDirectories: true)
+            try fileManager.createDirectory(atPath: destDir, withIntermediateDirectories: true)
         } catch {
             throw InstallError.copyFailed(error.localizedDescription)
         }
 
         // Copy (overwrite if exists)
         do {
-            if FileManager.default.fileExists(atPath: destPath) {
-                try FileManager.default.removeItem(atPath: destPath)
+            if fileManager.fileExists(atPath: destPath) {
+                try fileManager.removeItem(atPath: destPath)
             }
-            try FileManager.default.copyItem(atPath: url.path, toPath: destPath)
+            try fileManager.copyItem(atPath: url.path, toPath: destPath)
         } catch {
             throw InstallError.copyFailed(error.localizedDescription)
         }
@@ -465,10 +489,16 @@ class LaunchControlViewModel {
             }
         }
 
-        await loadLaunchItems()
+        if autoRefreshAfterInstall {
+            await loadLaunchItems()
+        }
     }
 
     private func runCommand(_ command: String, arguments: [String]) async -> (success: Bool, output: String) {
+        if let commandRunner {
+            return await commandRunner(command, arguments)
+        }
+
         let process = Process()
         process.executableURL = URL(fileURLWithPath: command)
         process.arguments = arguments
