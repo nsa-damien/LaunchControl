@@ -382,7 +382,69 @@ class LaunchControlViewModel {
     func refreshAll() async {
         await loadLaunchItems()
     }
-    
+
+    // MARK: - Install user agent
+
+    enum InstallError: LocalizedError {
+        case invalidPlist(String)
+        case missingLabel(String)
+        case copyFailed(String)
+
+        var errorDescription: String? {
+            switch self {
+            case .invalidPlist(let name): return "\(name) is not a valid property list"
+            case .missingLabel(let name): return "\(name) has no Label key"
+            case .copyFailed(let reason): return "Copy failed: \(reason)"
+            }
+        }
+    }
+
+    /// Validate that a URL points to a .plist with a Label key. Returns the label.
+    func validatePlist(at url: URL) throws -> String {
+        let data = try Data(contentsOf: url)
+        guard let plist = try PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any] else {
+            throw InstallError.invalidPlist(url.lastPathComponent)
+        }
+        guard let label = plist["Label"] as? String else {
+            throw InstallError.missingLabel(url.lastPathComponent)
+        }
+        return label
+    }
+
+    /// Check if a file with this name already exists in ~/Library/LaunchAgents.
+    func userAgentExists(fileName: String) -> Bool {
+        let dest = LaunchItemType.userAgent.expandedDirectory + "/" + fileName
+        return FileManager.default.fileExists(atPath: dest)
+    }
+
+    /// Copy plist to ~/Library/LaunchAgents, optionally enable and start it.
+    func installUserAgent(from url: URL, enableAndStart: Bool) async throws {
+        let fileName = url.lastPathComponent
+        let destDir = LaunchItemType.userAgent.expandedDirectory
+        let destPath = destDir + "/" + fileName
+
+        // Ensure target directory exists
+        try FileManager.default.createDirectory(atPath: destDir, withIntermediateDirectories: true)
+
+        // Copy (overwrite if exists)
+        if FileManager.default.fileExists(atPath: destPath) {
+            try FileManager.default.removeItem(atPath: destPath)
+        }
+        try FileManager.default.copyItem(atPath: url.path, toPath: destPath)
+
+        print("📦 Installed \(fileName) to \(destPath)")
+
+        if enableAndStart {
+            let label = try validatePlist(at: URL(fileURLWithPath: destPath))
+            let domain = "gui/\(getuid())"
+            _ = await runCommand("/bin/launchctl", arguments: ["enable", "\(domain)/\(label)"])
+            _ = await runCommand("/bin/launchctl", arguments: ["bootstrap", domain, destPath])
+            print("✅ Enabled and started \(label)")
+        }
+
+        await loadLaunchItems()
+    }
+
     private func runCommand(_ command: String, arguments: [String]) async -> (success: Bool, output: String) {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: command)
