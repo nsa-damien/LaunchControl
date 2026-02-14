@@ -29,6 +29,7 @@ jobs:
             -destination "platform=macOS" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
+            GCC_TREAT_WARNINGS_AS_ERRORS=YES \
             build
 
       - name: Static Analysis

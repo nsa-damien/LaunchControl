@@ -74,6 +74,15 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO
 
+      - name: Verify Archive
+        run: |
+          echo "Archive contents:"
+          ls -la build/LaunchControl.xcarchive/Products/Applications/
+          test -d "build/LaunchControl.xcarchive/Products/Applications/LaunchControl.app" || {
+            echo "ERROR: LaunchControl.app not found in archive"
+            exit 1
+          }
+
       - name: Create Zip
         run: |
           cd build && ditto -c -k --sequesterRsrc --keepParent \
