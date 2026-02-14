@@ -116,7 +116,6 @@ struct ContentView: View {
         }
         .onDrop(of: [.fileURL], isTargeted: nil) { providers in
             handleDrop(providers)
-            return true
         }
         .alert("Cannot Install", isPresented: $showDropError) {
             Button("OK", role: .cancel) {}
@@ -137,30 +136,8 @@ struct ContentView: View {
             }
         }
         .alert("Agent Installed", isPresented: $showPostInstallPrompt) {
-            Button("Enable & Start") {
-                guard let url = pendingDropURL else { return }
-                Task {
-                    do {
-                        try await viewModel.installUserAgent(from: url, enableAndStart: true)
-                    } catch {
-                        dropErrorMessage = error.localizedDescription
-                        showDropError = true
-                    }
-                    pendingDropURL = nil
-                }
-            }
-            Button("Just Copy", role: .cancel) {
-                guard let url = pendingDropURL else { return }
-                Task {
-                    do {
-                        try await viewModel.installUserAgent(from: url, enableAndStart: false)
-                    } catch {
-                        dropErrorMessage = error.localizedDescription
-                        showDropError = true
-                    }
-                    pendingDropURL = nil
-                }
-            }
+            Button("Enable & Start") { performInstall(enableAndStart: true) }
+            Button("Just Copy", role: .cancel) { performInstall(enableAndStart: false) }
         } message: {
             if let url = pendingDropURL {
                 Text("\(url.lastPathComponent) will be copied to ~/Library/LaunchAgents. Enable and start it now?")
@@ -168,53 +145,60 @@ struct ContentView: View {
         }
     }
     
-    private func handleDrop(_ providers: [NSItemProvider]) {
+    private func performInstall(enableAndStart: Bool) {
+        guard let url = pendingDropURL else { return }
+        Task {
+            do {
+                try await viewModel.installUserAgent(from: url, enableAndStart: enableAndStart)
+            } catch {
+                dropErrorMessage = error.localizedDescription
+                showDropError = true
+            }
+            pendingDropURL = nil
+        }
+    }
+
+    private func handleDrop(_ providers: [NSItemProvider]) -> Bool {
         guard viewModel.selectedType == .userAgent else {
             dropErrorMessage = "Switch to User Agents filter to install agents."
             showDropError = true
-            return
+            return false
         }
 
-        guard let provider = providers.first else { return }
+        guard let provider = providers.first else { return false }
 
-        provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { data, error in
-            guard let data = data as? Data,
+        Task {
+            guard let item = try? await provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier),
+                  let data = item as? Data,
                   let url = URL(dataRepresentation: data, relativeTo: nil) else {
-                DispatchQueue.main.async {
-                    dropErrorMessage = "Could not read dropped file."
-                    showDropError = true
-                }
+                dropErrorMessage = "Could not read dropped file."
+                showDropError = true
                 return
             }
 
             guard url.pathExtension.lowercased() == "plist" else {
-                DispatchQueue.main.async {
-                    dropErrorMessage = "Only .plist files can be installed as launch agents."
-                    showDropError = true
-                }
+                dropErrorMessage = "Only .plist files can be installed as launch agents."
+                showDropError = true
                 return
             }
 
             do {
                 _ = try viewModel.validatePlist(at: url)
             } catch {
-                DispatchQueue.main.async {
-                    dropErrorMessage = error.localizedDescription
-                    showDropError = true
-                }
+                dropErrorMessage = error.localizedDescription
+                showDropError = true
                 return
             }
 
-            DispatchQueue.main.async {
-                pendingDropURL = url
-
-                if viewModel.userAgentExists(fileName: url.lastPathComponent) {
-                    showOverwriteConfirm = true
-                } else {
-                    showPostInstallPrompt = true
-                }
+            pendingDropURL = url
+            if viewModel.userAgentExists(fileName: url.lastPathComponent) {
+                showOverwriteConfirm = true
+            } else {
+                showPostInstallPrompt = true
             }
         }
+
+        return true
     }
 
     private func proceedWithInstall(url: URL) {
