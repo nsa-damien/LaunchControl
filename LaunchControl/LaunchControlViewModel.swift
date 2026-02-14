@@ -413,7 +413,8 @@ class LaunchControlViewModel {
 
     /// Check if a file with this name already exists in ~/Library/LaunchAgents.
     func userAgentExists(fileName: String) -> Bool {
-        let dest = LaunchItemType.userAgent.expandedDirectory + "/" + fileName
+        let dir = LaunchItemType.userAgent.expandedDirectory
+        let dest = (dir as NSString).appendingPathComponent(fileName)
         return FileManager.default.fileExists(atPath: dest)
     }
 
@@ -421,25 +422,41 @@ class LaunchControlViewModel {
     func installUserAgent(from url: URL, enableAndStart: Bool) async throws {
         let fileName = url.lastPathComponent
         let destDir = LaunchItemType.userAgent.expandedDirectory
-        let destPath = destDir + "/" + fileName
+        let destPath = (destDir as NSString).appendingPathComponent(fileName)
 
         // Ensure target directory exists
-        try FileManager.default.createDirectory(atPath: destDir, withIntermediateDirectories: true)
+        do {
+            try FileManager.default.createDirectory(atPath: destDir, withIntermediateDirectories: true)
+        } catch {
+            throw InstallError.copyFailed(error.localizedDescription)
+        }
 
         // Copy (overwrite if exists)
-        if FileManager.default.fileExists(atPath: destPath) {
-            try FileManager.default.removeItem(atPath: destPath)
+        do {
+            if FileManager.default.fileExists(atPath: destPath) {
+                try FileManager.default.removeItem(atPath: destPath)
+            }
+            try FileManager.default.copyItem(atPath: url.path, toPath: destPath)
+        } catch {
+            throw InstallError.copyFailed(error.localizedDescription)
         }
-        try FileManager.default.copyItem(atPath: url.path, toPath: destPath)
 
         print("📦 Installed \(fileName) to \(destPath)")
 
         if enableAndStart {
             let label = try validatePlist(at: URL(fileURLWithPath: destPath))
             let domain = "gui/\(getuid())"
-            _ = await runCommand("/bin/launchctl", arguments: ["enable", "\(domain)/\(label)"])
-            _ = await runCommand("/bin/launchctl", arguments: ["bootstrap", domain, destPath])
-            print("✅ Enabled and started \(label)")
+            let enableResult = await runCommand("/bin/launchctl", arguments: ["enable", "\(domain)/\(label)"])
+            if !enableResult.success {
+                print("⚠️ Warning: launchctl enable failed for \(label): \(enableResult.output)")
+            }
+            let bootstrapResult = await runCommand("/bin/launchctl", arguments: ["bootstrap", domain, destPath])
+            if !bootstrapResult.success {
+                print("⚠️ Warning: launchctl bootstrap failed for \(label): \(bootstrapResult.output)")
+            }
+            if enableResult.success && bootstrapResult.success {
+                print("✅ Enabled and started \(label)")
+            }
         }
 
         await loadLaunchItems()
