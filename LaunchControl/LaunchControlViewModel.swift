@@ -401,6 +401,9 @@ class LaunchControlViewModel {
 
     /// Validate that a URL points to a .plist with a Label key. Returns the label.
     func validatePlist(at url: URL) throws -> String {
+        let accessing = url.startAccessingSecurityScopedResource()
+        defer { if accessing { url.stopAccessingSecurityScopedResource() } }
+
         let data = try Data(contentsOf: url)
         guard let plist = try PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any] else {
             throw InstallError.invalidPlist(url.lastPathComponent)
@@ -420,6 +423,9 @@ class LaunchControlViewModel {
 
     /// Copy plist to ~/Library/LaunchAgents, optionally enable and start it.
     func installUserAgent(from url: URL, enableAndStart: Bool) async throws {
+        let accessing = url.startAccessingSecurityScopedResource()
+        defer { if accessing { url.stopAccessingSecurityScopedResource() } }
+
         let fileName = url.lastPathComponent
         let destDir = LaunchItemType.userAgent.expandedDirectory
         let destPath = (destDir as NSString).appendingPathComponent(fileName)
