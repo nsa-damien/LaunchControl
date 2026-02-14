@@ -6,12 +6,18 @@
 //
 
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct ContentView: View {
     @State private var viewModel = LaunchControlViewModel()
     @State private var selectedItem: LaunchItem?
     @State private var showingDebug = false
-    
+    @State private var showDropError = false
+    @State private var dropErrorMessage = ""
+    @State private var showOverwriteConfirm = false
+    @State private var showPostInstallPrompt = false
+    @State private var pendingDropURL: URL?
+
     var body: some View {
         NavigationSplitView {
             // Sidebar with filters
@@ -72,6 +78,9 @@ struct ContentView: View {
                             },
                             onDisable: {
                                 await viewModel.disableItem(item)
+                            },
+                            onDelete: {
+                                await viewModel.deleteItem(item)
                             }
                         )
                         .tag(item)
@@ -105,8 +114,98 @@ struct ContentView: View {
         .sheet(isPresented: $showingDebug) {
             SimpleDebugView()
         }
+        .onDrop(of: [.fileURL], isTargeted: nil) { providers in
+            handleDrop(providers)
+        }
+        .alert("Cannot Install", isPresented: $showDropError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(dropErrorMessage)
+        }
+        .alert("File Already Exists", isPresented: $showOverwriteConfirm) {
+            Button("Replace", role: .destructive) {
+                guard let url = pendingDropURL else { return }
+                proceedWithInstall(url: url)
+            }
+            Button("Cancel", role: .cancel) {
+                pendingDropURL = nil
+            }
+        } message: {
+            if let url = pendingDropURL {
+                Text("\(url.lastPathComponent) already exists in ~/Library/LaunchAgents. Replace it?")
+            }
+        }
+        .alert("Agent Installed", isPresented: $showPostInstallPrompt) {
+            Button("Enable & Start") { performInstall(enableAndStart: true) }
+            Button("Just Copy", role: .cancel) { performInstall(enableAndStart: false) }
+        } message: {
+            if let url = pendingDropURL {
+                Text("\(url.lastPathComponent) will be copied to ~/Library/LaunchAgents. Enable and start it now?")
+            }
+        }
     }
     
+    private func performInstall(enableAndStart: Bool) {
+        guard let url = pendingDropURL else { return }
+        Task {
+            do {
+                try await viewModel.installUserAgent(from: url, enableAndStart: enableAndStart)
+            } catch {
+                dropErrorMessage = error.localizedDescription
+                showDropError = true
+            }
+            pendingDropURL = nil
+        }
+    }
+
+    private func handleDrop(_ providers: [NSItemProvider]) -> Bool {
+        guard viewModel.selectedType == .userAgent else {
+            dropErrorMessage = "Switch to User Agents filter to install agents."
+            showDropError = true
+            return false
+        }
+
+        guard let provider = providers.first else { return false }
+
+        Task {
+            guard let item = try? await provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier),
+                  let data = item as? Data,
+                  let url = URL(dataRepresentation: data, relativeTo: nil) else {
+                dropErrorMessage = "Could not read dropped file."
+                showDropError = true
+                return
+            }
+
+            guard url.pathExtension.lowercased() == "plist" else {
+                dropErrorMessage = "Only .plist files can be installed as launch agents."
+                showDropError = true
+                return
+            }
+
+            do {
+                _ = try viewModel.validatePlist(at: url)
+            } catch {
+                dropErrorMessage = error.localizedDescription
+                showDropError = true
+                return
+            }
+
+            pendingDropURL = url
+            if viewModel.userAgentExists(fileName: url.lastPathComponent) {
+                showOverwriteConfirm = true
+            } else {
+                showPostInstallPrompt = true
+            }
+        }
+
+        return true
+    }
+
+    private func proceedWithInstall(url: URL) {
+        pendingDropURL = url
+        showPostInstallPrompt = true
+    }
+
     private func iconForType(_ type: LaunchItemType) -> String {
         switch type {
         case .userAgent:
