@@ -85,8 +85,8 @@ struct LaunchControlTests {
             Issue.record("Expected invalid plist to throw")
         } catch let error as LaunchControlViewModel.InstallError {
             switch error {
-            case .invalidPlist(let fileName):
-                #expect(fileName == "invalid.plist")
+            case .invalidPlist(let detail):
+                #expect(detail.hasPrefix("invalid.plist"))
             default:
                 Issue.record("Unexpected error: \(error.localizedDescription)")
             }
@@ -173,6 +173,62 @@ struct LaunchControlTests {
         #expect(calls[1].arguments[2].hasSuffix("/com.example.agent.plist"))
     }
 
+    @Test
+    func installUserAgent_throwsCopyFailed_whenDirectoryUnwritable() async throws {
+        let tempDir = try makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let sourceDir = tempDir.appendingPathComponent("source", isDirectory: true)
+        try FileManager.default.createDirectory(at: sourceDir, withIntermediateDirectories: true)
+        let sourceURL = sourceDir.appendingPathComponent("agent.plist")
+        try writePlist(["Label": "com.example.agent"], to: sourceURL)
+
+        let viewModel = LaunchControlViewModel(
+            userAgentDirectory: "/nonexistent/deeply/nested/path",
+            autoRefreshAfterInstall: false
+        )
+
+        do {
+            try await viewModel.installUserAgent(from: sourceURL, enableAndStart: false)
+            Issue.record("Expected copyFailed error")
+        } catch let error as LaunchControlViewModel.InstallError {
+            switch error {
+            case .copyFailed:
+                break // expected
+            default:
+                Issue.record("Expected copyFailed, got \(error)")
+            }
+        }
+    }
+
+    @Test
+    func installUserAgent_enableAndStart_completesWhenLaunchctlFails() async throws {
+        let tempDir = try makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let installDir = tempDir.appendingPathComponent("LaunchAgents", isDirectory: true)
+        let sourceDir = tempDir.appendingPathComponent("source", isDirectory: true)
+        try FileManager.default.createDirectory(at: sourceDir, withIntermediateDirectories: true)
+
+        let sourceURL = sourceDir.appendingPathComponent("agent.plist")
+        try writePlist(["Label": "com.example.agent"], to: sourceURL)
+
+        let viewModel = LaunchControlViewModel(
+            userAgentDirectory: installDir.path,
+            commandRunner: { _, _ in (false, "service not found") },
+            autoRefreshAfterInstall: false
+        )
+
+        // Should NOT throw even though launchctl fails
+        try await viewModel.installUserAgent(from: sourceURL, enableAndStart: true)
+
+        // File should still be installed
+        #expect(viewModel.userAgentExists(fileName: "agent.plist") == true)
+        // errorMessage should be set to inform the user
+        #expect(viewModel.errorMessage != nil)
+        #expect(viewModel.errorMessage?.contains("copied but") == true)
+    }
+
     private actor CommandCollector {
         private var calls: [(command: String, arguments: [String])] = []
 
@@ -197,6 +253,8 @@ struct LaunchControlTests {
         try data.write(to: url)
     }
 
+    private enum TestError: Error { case missingLabel }
+
     private func readPlistLabel(from url: URL) throws -> String {
         let data = try Data(contentsOf: url)
         let plist = try PropertyListSerialization.propertyList(from: data, format: nil)
@@ -204,8 +262,7 @@ struct LaunchControlTests {
             let dict = plist as? [String: Any],
             let label = dict["Label"] as? String
         else {
-            Issue.record("Installed plist is missing Label")
-            return ""
+            throw TestError.missingLabel
         }
         return label
     }
