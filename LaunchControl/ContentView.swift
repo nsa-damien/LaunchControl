@@ -17,6 +17,7 @@ struct ContentView: View {
     @State private var showOverwriteConfirm = false
     @State private var showPostInstallPrompt = false
     @State private var pendingDropURL: URL?
+    @State private var editingItem: LaunchItem?
 
     var body: some View {
         NavigationSplitView {
@@ -84,6 +85,7 @@ struct ContentView: View {
                             }
                         )
                         .tag(item)
+                    .onTapGesture(count: 2) { editingItem = item }
                     }
                     .searchable(text: $viewModel.searchText, prompt: "Search launch items")
                 }
@@ -142,6 +144,15 @@ struct ContentView: View {
             if let url = pendingDropURL {
                 Text("\(url.lastPathComponent) will be copied to ~/Library/LaunchAgents. Enable and start it now?")
             }
+        }
+        .sheet(item: $editingItem) { item in
+            PlistEditorView(item: item, onReload: {
+                if item.isLoaded {
+                    await viewModel.unloadItem(item)
+                    await viewModel.loadItem(item)
+                }
+                await viewModel.refreshAll()
+            })
         }
     }
     
