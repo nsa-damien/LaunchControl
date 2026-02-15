@@ -12,6 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GitHub Actions CI workflow for pull request checks (build and test)
 - GitHub Actions Release workflow for automated builds on version tags
 - Unit test suite for ViewModel filtering, plist validation, and agent installation
+- Plist editor/viewer: double-click any launch item to view or edit its configuration
+- Structured form editor with sections for Program, Schedule, Environment, I/O, and Advanced settings
+- Raw XML tab for inspecting full plist source
+- Read-only mode for system agents and daemons
+- Save with reload prompt for running agents
+- Reusable editor components: ListEditorView, KeyValueEditorView, CalendarIntervalEditorView
+- PlistDocument model with round-trip plist parsing
 
 ### Changed
 - ViewModel supports dependency injection for FileManager, command runner, and agent directory (testability)
