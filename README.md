@@ -14,6 +14,7 @@ A macOS app for managing LaunchAgents and LaunchDaemons with Touch ID authentica
 - **Real-time status monitoring** showing whether items are running, stopped, or loaded
 - **Search and filter** capabilities
 - **Drag-and-drop installation** of new user agents from Finder
+- **Plist Editor** — Double-click any item to view/edit its configuration with a structured form and raw XML view
 - Modern macOS interface with split-view layout
 
 ## Requirements

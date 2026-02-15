@@ -15,6 +15,7 @@ struct LaunchItemRow: View {
     let onEnable: () async -> Void
     let onDisable: () async -> Void
     let onDelete: () async -> Void
+    let onEdit: () -> Void
     
     @State private var isWorking = false
     @State private var showingDeleteAlert = false
@@ -97,7 +98,20 @@ struct LaunchItemRow: View {
             }
         }
         .padding(.vertical, 4)
+        .contentShape(Rectangle())
+        .simultaneousGesture(
+            TapGesture(count: 2).onEnded {
+                onEdit()
+            }
+        )
         .contextMenu {
+            // Edit section
+            Section {
+                Button(action: onEdit) {
+                    Label("Edit", systemImage: "pencil")
+                }
+            }
+
             // Start/Stop section
             Section {
                 if item.status == .running {
