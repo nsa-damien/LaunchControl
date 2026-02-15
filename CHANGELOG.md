@@ -7,23 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-02-15
+
 ### Added
-- Reveal in Finder context menu action for launch items
-- GitHub Actions CI workflow for pull request checks (build and test)
-- GitHub Actions Release workflow for automated builds on version tags
-- Unit test suite for ViewModel filtering, plist validation, and agent installation
 - Plist editor/viewer: double-click any launch item to view or edit its configuration
 - Structured form editor with sections for Program, Schedule, Environment, I/O, and Advanced settings
 - Raw XML tab for inspecting full plist source
 - Read-only mode for system agents and daemons
 - Save with reload prompt for running agents
+- Edit context menu item on launch items
 - Reusable editor components: ListEditorView, KeyValueEditorView, CalendarIntervalEditorView
 - PlistDocument model with round-trip plist parsing
+- Makefile with build, test, archive, and package targets
+- Reveal in Finder context menu action for launch items
+- GitHub Actions CI workflow for pull request checks (build and test)
+- GitHub Actions Release workflow for automated builds on version tags
+- Unit test suite for ViewModel filtering, plist validation, and agent installation
 
 ### Changed
+- Double-click edit moved into LaunchItemRow via onEdit callback for better encapsulation
 - ViewModel supports dependency injection for FileManager, command runner, and agent directory (testability)
 
 ### Fixed
+- CalendarIntervalEditorView picker labels display correctly on macOS
 - launchctl enable/bootstrap failures now surface to user via error message
 - Plist parse errors preserve original error details instead of generic message
 - deleteItemWithoutAuth uses injected FileManager consistently
