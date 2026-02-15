@@ -82,10 +82,12 @@ struct ContentView: View {
                             },
                             onDelete: {
                                 await viewModel.deleteItem(item)
+                            },
+                            onEdit: {
+                                editingItem = item
                             }
                         )
                         .tag(item)
-                    .onTapGesture(count: 2) { editingItem = item }
                     }
                     .searchable(text: $viewModel.searchText, prompt: "Search launch items")
                 }
@@ -301,4 +303,3 @@ private struct SimpleDebugView: View {
 #Preview {
     ContentView()
 }
-

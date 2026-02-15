@@ -13,7 +13,9 @@ struct CalendarIntervalEditorView: View {
         Section("Calendar Schedule") {
             ForEach(intervals.indices, id: \.self) { index in
                 HStack(spacing: 12) {
-                    Picker("Day", selection: Binding(
+                    Text("Day")
+
+                    Picker("", selection: Binding(
                         get: { intervals[index].weekday ?? 0 },
                         set: { intervals[index].weekday = $0 == 0 ? nil : $0 }
                     )) {
@@ -22,10 +24,13 @@ struct CalendarIntervalEditorView: View {
                             Text(Self.weekdayNames[day] ?? "").tag(day)
                         }
                     }
+                    .labelsHidden()
                     .frame(maxWidth: 140)
                     .disabled(!isEditable)
 
-                    Picker("Hour", selection: Binding(
+                    Text("Hour")
+
+                    Picker("", selection: Binding(
                         get: { intervals[index].hour ?? 0 },
                         set: { intervals[index].hour = $0 }
                     )) {
@@ -33,12 +38,15 @@ struct CalendarIntervalEditorView: View {
                             Text(String(format: "%02d", h)).tag(h)
                         }
                     }
+                    .labelsHidden()
                     .frame(maxWidth: 70)
                     .disabled(!isEditable)
 
                     Text(":")
 
-                    Picker("Min", selection: Binding(
+                    Text("Min")
+
+                    Picker("", selection: Binding(
                         get: { intervals[index].minute ?? 0 },
                         set: { intervals[index].minute = $0 }
                     )) {
@@ -46,6 +54,7 @@ struct CalendarIntervalEditorView: View {
                             Text(String(format: "%02d", m)).tag(m)
                         }
                     }
+                    .labelsHidden()
                     .frame(maxWidth: 70)
                     .disabled(!isEditable)
 

@@ -70,6 +70,9 @@ struct ContentView_NoDebug: View {
                             },
                             onDelete: {
                                 await viewModel.deleteItem(item)
+                            },
+                            onEdit: {
+                                // No plist editor in this temporary view.
                             }
                         )
                         .tag(item)
