@@ -266,4 +266,126 @@ struct LaunchControlTests {
         }
         return label
     }
+
+    // MARK: - PlistDocument Tests
+
+    @Test
+    func plistDocument_parsesStructuredFields() throws {
+        let dict: [String: Any] = [
+            "Label": "com.example.test",
+            "Program": "/usr/bin/env",
+            "ProgramArguments": ["/bin/bash", "-c", "echo hello"],
+            "RunAtLoad": true,
+            "KeepAlive": false,
+            "StartInterval": 300,
+            "EnvironmentVariables": ["HOME": "/Users/test"],
+            "WorkingDirectory": "/tmp",
+            "StandardOutPath": "/tmp/out.log",
+            "StandardErrorPath": "/tmp/err.log",
+            "ThrottleInterval": 60,
+            "Nice": 5,
+            "ProcessType": "Background"
+        ]
+        let data = try PropertyListSerialization.data(fromPropertyList: dict, format: .xml, options: 0)
+        let doc = try PlistDocument(data: data)
+
+        #expect(doc.label == "com.example.test")
+        #expect(doc.program == "/usr/bin/env")
+        #expect(doc.programArguments == ["/bin/bash", "-c", "echo hello"])
+        #expect(doc.runAtLoad == true)
+        #expect(doc.keepAlive == false)
+        #expect(doc.startInterval == 300)
+        #expect(doc.environmentVariables == ["HOME": "/Users/test"])
+        #expect(doc.workingDirectory == "/tmp")
+        #expect(doc.standardOutPath == "/tmp/out.log")
+        #expect(doc.standardErrorPath == "/tmp/err.log")
+        #expect(doc.throttleInterval == 60)
+        #expect(doc.nice == 5)
+        #expect(doc.processType == "Background")
+    }
+
+    @Test
+    func plistDocument_preservesOtherKeys() throws {
+        let dict: [String: Any] = [
+            "Label": "com.example.test",
+            "ProgramArguments": ["/bin/true"],
+            "SomeCustomKey": "custom-value",
+            "AnotherKey": 42
+        ]
+        let data = try PropertyListSerialization.data(fromPropertyList: dict, format: .xml, options: 0)
+        let doc = try PlistDocument(data: data)
+
+        #expect(doc.otherKeys["SomeCustomKey"] as? String == "custom-value")
+        #expect(doc.otherKeys["AnotherKey"] as? Int == 42)
+        #expect(doc.otherKeys["Label"] == nil)
+        #expect(doc.otherKeys["ProgramArguments"] == nil)
+    }
+
+    @Test
+    func plistDocument_roundTrips() throws {
+        let dict: [String: Any] = [
+            "Label": "com.example.test",
+            "ProgramArguments": ["/bin/bash", "-c", "echo hello"],
+            "RunAtLoad": true,
+            "EnvironmentVariables": ["PATH": "/usr/bin"],
+            "SomeCustomKey": "preserved"
+        ]
+        let data = try PropertyListSerialization.data(fromPropertyList: dict, format: .xml, options: 0)
+        var doc = try PlistDocument(data: data)
+        doc.runAtLoad = false
+        doc.programArguments = ["/bin/zsh"]
+
+        let outputDict = doc.toDictionary()
+        #expect(outputDict["RunAtLoad"] as? Bool == nil) // false = omitted
+        #expect(outputDict["ProgramArguments"] as? [String] == ["/bin/zsh"])
+        #expect(outputDict["Label"] as? String == "com.example.test")
+        #expect(outputDict["SomeCustomKey"] as? String == "preserved")
+    }
+
+    @Test
+    func plistDocument_parsesCalendarInterval() throws {
+        let dict: [String: Any] = [
+            "Label": "com.example.test",
+            "ProgramArguments": ["/bin/true"],
+            "StartCalendarInterval": [
+                ["Hour": 7, "Minute": 0, "Weekday": 1],
+                ["Hour": 15, "Minute": 30]
+            ]
+        ]
+        let data = try PropertyListSerialization.data(fromPropertyList: dict, format: .xml, options: 0)
+        let doc = try PlistDocument(data: data)
+
+        #expect(doc.startCalendarInterval.count == 2)
+        #expect(doc.startCalendarInterval[0].hour == 7)
+        #expect(doc.startCalendarInterval[0].minute == 0)
+        #expect(doc.startCalendarInterval[0].weekday == 1)
+        #expect(doc.startCalendarInterval[1].hour == 15)
+        #expect(doc.startCalendarInterval[1].minute == 30)
+        #expect(doc.startCalendarInterval[1].weekday == nil)
+    }
+
+    @Test
+    func plistDocument_parsesSingleCalendarInterval() throws {
+        let dict: [String: Any] = [
+            "Label": "com.example.test",
+            "ProgramArguments": ["/bin/true"],
+            "StartCalendarInterval": ["Hour": 9, "Minute": 15]
+        ]
+        let data = try PropertyListSerialization.data(fromPropertyList: dict, format: .xml, options: 0)
+        let doc = try PlistDocument(data: data)
+
+        #expect(doc.startCalendarInterval.count == 1)
+        #expect(doc.startCalendarInterval[0].hour == 9)
+        #expect(doc.startCalendarInterval[0].minute == 15)
+    }
+
+    @Test
+    func plistDocument_throwsForMissingLabel() throws {
+        let dict: [String: Any] = ["ProgramArguments": ["/bin/true"]]
+        let data = try PropertyListSerialization.data(fromPropertyList: dict, format: .xml, options: 0)
+
+        #expect(throws: (any Error).self) {
+            try PlistDocument(data: data)
+        }
+    }
 }
