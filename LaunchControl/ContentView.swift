@@ -83,6 +83,9 @@ struct ContentView: View {
                             onDelete: {
                                 await viewModel.deleteItem(item)
                             },
+                            onKickstart: {
+                                await viewModel.kickstartItem(item)
+                            },
                             onEdit: {
                                 editingItem = item
                             }

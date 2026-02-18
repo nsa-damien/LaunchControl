@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- "Run Now" context menu option to trigger on-demand execution via `launchctl kickstart`
+
 ## [0.3.0] - 2026-02-15
 
 ### Added
