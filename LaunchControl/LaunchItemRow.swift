@@ -15,6 +15,7 @@ struct LaunchItemRow: View {
     let onEnable: () async -> Void
     let onDisable: () async -> Void
     let onDelete: () async -> Void
+    let onKickstart: () async -> Void
     let onEdit: () -> Void
     
     @State private var isWorking = false
@@ -133,6 +134,17 @@ struct LaunchItemRow: View {
                 }
             }
             
+            // Run Now (kickstart)
+            Section {
+                Button(action: {
+                    Task {
+                        await onKickstart()
+                    }
+                }) {
+                    Label("Run Now", systemImage: "bolt.circle")
+                }
+            }
+
             // Enable/Disable section
             Section {
                 if item.isEnabled {

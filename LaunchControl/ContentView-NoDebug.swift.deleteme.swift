@@ -71,6 +71,9 @@ struct ContentView_NoDebug: View {
                             onDelete: {
                                 await viewModel.deleteItem(item)
                             },
+                            onKickstart: {
+                                await viewModel.kickstartItem(item)
+                            },
                             onEdit: {
                                 // No plist editor in this temporary view.
                             }

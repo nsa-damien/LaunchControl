@@ -289,6 +289,19 @@ class LaunchControlViewModel {
         }
     }
     
+    func kickstartItem(_ item: LaunchItem) async {
+        do {
+            if item.requiresAuth {
+                try await kickstartItemWithAuth(item)
+            } else {
+                await kickstartItemWithoutAuth(item)
+            }
+            await updateItemStatus(item)
+        } catch {
+            errorMessage = "Failed to run \(item.displayName): \(error.localizedDescription)"
+        }
+    }
+
     func deleteItem(_ item: LaunchItem) async {
         do {
             // First, unload if currently loaded
@@ -338,6 +351,11 @@ class LaunchControlViewModel {
         let domain = "gui/\(getuid())"
         _ = await runCommand("/bin/launchctl", arguments: ["disable", "\(domain)/\(item.label)"])
     }
+
+    private func kickstartItemWithoutAuth(_ item: LaunchItem) async {
+        let domain = "gui/\(getuid())"
+        _ = await runCommand("/bin/launchctl", arguments: ["kickstart", "\(domain)/\(item.label)"])
+    }
     
     // MARK: - System-level operations (require auth)
     
@@ -370,6 +388,14 @@ class LaunchControlViewModel {
         _ = try await authHelper.executeWithAuthentication(
             command: "/bin/launchctl",
             arguments: ["disable", "\(domain)/\(item.label)"]
+        )
+    }
+
+    private func kickstartItemWithAuth(_ item: LaunchItem) async throws {
+        let domain = "system"
+        _ = try await authHelper.executeWithAuthentication(
+            command: "/bin/launchctl",
+            arguments: ["kickstart", "\(domain)/\(item.label)"]
         )
     }
     
